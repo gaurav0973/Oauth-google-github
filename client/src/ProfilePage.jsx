@@ -4,13 +4,31 @@ const ProfilePage = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // 🔥 fetch logged-in user
+    // 🔥 fetch with refresh token logic
+    const fetchWithAuth = async (url) => {
+        let res = await fetch(url, {
+        credentials: "include",
+        });
+
+        // 🔁 if access expired → refresh
+        if (res.status === 401) {
+        await fetch("http://localhost:5000/refresh", {
+            credentials: "include",
+        });
+
+        // retry original request
+        res = await fetch(url, {
+            credentials: "include",
+        });
+        }
+
+        return res;
+    };
+
     useEffect(() => {
         const fetchUser = async () => {
         try {
-            const res = await fetch("http://localhost:5000/me", {
-            credentials: "include", // 🔥 IMPORTANT
-            });
+            const res = await fetchWithAuth("http://localhost:5000/me");
 
             if (!res.ok) {
             throw new Error("Not authenticated");
@@ -20,7 +38,11 @@ const ProfilePage = () => {
             setUser(data.user);
         } catch (err) {
             console.error(err);
-            window.location.href = "/"; // redirect if not logged in
+
+            // ✅ safe redirect (NO LOOP)
+            if (window.location.pathname !== "/") {
+            window.location.replace("/");
+            }
         } finally {
             setLoading(false);
         }
@@ -36,7 +58,7 @@ const ProfilePage = () => {
         credentials: "include",
         });
 
-        window.location.href = "/";
+        window.location.replace("/");
     };
 
     if (loading) {
@@ -50,14 +72,15 @@ const ProfilePage = () => {
         </h2>
 
         <p className="mb-4">Email: {user?.email}</p>
-        
-        {
-            <img
-                src={user?.photo || "https://placehold.co/100x100"}
-                alt="profile"
-                className="w-24 h-24 rounded-full mx-auto mb-4"
-                />
-        }
+
+        <img
+            src={user?.photo || "https://placehold.co/100x100"}
+            alt="profile"
+            onError={(e) => {
+            e.target.src = "https://placehold.co/100x100";
+            }}
+            className="w-24 h-24 rounded-full mx-auto mb-4"
+        />
 
         <button
             onClick={handleLogout}

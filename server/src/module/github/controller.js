@@ -2,7 +2,7 @@ import { generateState } from "arctic";
 import { github } from "../../common/oAuth/github.auth.js";
 import { User } from "../../common/models/user.model.js";
 import { OauthAccount } from "../../common/models/oauthAccount.model.js";
-import { generateToken } from "../../common/utils/jwt.js";
+import { generateAccessToken, generateRefreshToken } from "../../common/utils/jwt.js";
 
 const FRONTEND_ORIGIN =
     process.env.FRONTEND_ORIGIN || "http://localhost:5173";
@@ -106,14 +106,21 @@ export const getGithubCallbackPage = async (req, res) => {
         }
         }
 
-        // 🔥 COMMON AUTH (THIS WAS MISSING)
-        const token = generateToken(user._id);
+        const accessToken = generateAccessToken(user._id);
+        const refreshToken = generateRefreshToken(user._id);
 
-        res.cookie("token", token, {
-        httpOnly: true,
-        secure: false, // true in production
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        res.cookie("accessToken", accessToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: "lax",
+            maxAge: 15 * 60 * 1000,
+        });
+
+        res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
         res.clearCookie("github_oauth_state");

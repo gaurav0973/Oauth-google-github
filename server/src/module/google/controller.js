@@ -2,32 +2,32 @@ import { decodeIdToken, generateCodeVerifier, generateState } from "arctic";
 import { google } from "../../common/oAuth/google.auth.js";
 import { OauthAccount } from "../../common/models/oauthAccount.model.js";
 import { User } from "../../common/models/user.model.js";
-import { generateToken } from "../../common/utils/jwt.js";
+import { generateAccessToken, generateRefreshToken } from "../../common/utils/jwt.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
 
 export const getGoogleLoginPage = async (req, res) => {
-  const state = generateState();
-  console.log("Generated State 👉", state);
+    const state = generateState();
+    console.log("Generated State 👉", state);
 
-  const codeVerifier = generateCodeVerifier();
-  console.log("Generated Code Verifier 👉", codeVerifier);
+    const codeVerifier = generateCodeVerifier();
+    console.log("Generated Code Verifier 👉", codeVerifier);
 
-  const scopes = ["openid", "profile", "email"];
-  const url = google.createAuthorizationURL(state, codeVerifier, scopes);
-  console.log("AUTH URL 👉", url.toString());
+    const scopes = ["openid", "profile", "email"];
+    const url = google.createAuthorizationURL(state, codeVerifier, scopes);
+    console.log("AUTH URL 👉", url.toString());
 
-  // setup in cookies
-  const cookieOptions = {
-    httpOnly: true,
-    secure: true,
-    maxAge: 5 * 60 * 1000, // 5 minutes
-    sameSite: "lax",
-  };
-  res.cookie("google_oauth_state", state, cookieOptions);
-  res.cookie("google_code_verifier", codeVerifier, cookieOptions);
+    // setup in cookies
+    const cookieOptions = {
+        httpOnly: true,
+        secure: true,
+        maxAge: 5 * 60 * 1000, // 5 minutes
+        sameSite: "lax",
+    };
+    res.cookie("google_oauth_state", state, cookieOptions);
+    res.cookie("google_code_verifier", codeVerifier, cookieOptions);
 
-  return res.redirect(url.toString());
+    return res.redirect(url.toString());
 };
 
 
@@ -81,11 +81,21 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
             console.log("User from DB 👉", user);
 
             // TODO: generate JWT and set cookie here for real app
-            const token = generateToken(user._id);
+            const accessToken = generateAccessToken(user._id);
+            const refreshToken = generateRefreshToken(user._id);
 
-            res.cookie("token", token, {
+            // access token (short)
+            res.cookie("accessToken", accessToken, {
                 httpOnly: true,
-                secure: false, // change to true in production (HTTPS)
+                secure: false,
+                sameSite: "lax",
+                maxAge: 15 * 60 * 1000, // 15 min
+            });
+
+            // refresh token (long)
+            res.cookie("refreshToken", refreshToken, {
+                httpOnly: true,
+                secure: false,
                 sameSite: "lax",
                 maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
             });
@@ -111,11 +121,19 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
             });
 
             // TODO: generate JWT and set cookie here for real app
-            const token = generateToken(user._id);
+            const accessToken = generateAccessToken(user._id);
+            const refreshToken = generateRefreshToken(user._id);
 
-            res.cookie("token", token, {
+            res.cookie("accessToken", accessToken, {
                 httpOnly: true,
-                secure: false, // change to true in production (HTTPS)
+                secure: false,
+                sameSite: "lax",
+                maxAge: 15 * 60 * 1000, // 15 min
+            });
+
+            res.cookie("refreshToken", refreshToken, {
+                httpOnly: true,
+                secure: false,
                 sameSite: "lax",
                 maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
             });
@@ -141,15 +159,21 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
         });
 
         // TODO: generate JWT and set cookie here for real app
-        const token = generateToken(user._id);
+        const accessToken = generateAccessToken(user._id);
+        const refreshToken = generateRefreshToken(user._id);
 
-        res.cookie("token", token, {
+        res.cookie("accessToken", accessToken, {
             httpOnly: true,
-            secure: false, // change to true in production (HTTPS)
+            secure: false,
             sameSite: "lax",
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
-
+        res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
         // clear temp OAuth cookies
         res.clearCookie("google_oauth_state");
         res.clearCookie("google_code_verifier");
