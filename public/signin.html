@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,197,94,0.18),_transparent_32%),radial-gradient(circle_at_bottom_left,_rgba(59,130,246,0.16),_transparent_28%)]"></div>
+    <main class="relative mx-auto flex min-h-screen max-w-5xl items-center px-4 py-10 sm:px-6">
+        <div class="grid w-full overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-emerald-950/20 lg:grid-cols-[1fr_0.9fr]">
+            <section class="p-8 sm:p-10">
+                <p class="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-200">Authorization Code</p>
+                <h1 class="mt-5 text-4xl font-black tracking-tight text-white">Signin and return a code to your client</h1>
+                <p class="mt-4 max-w-md text-base leading-7 text-slate-300">This page checks the user credentials, validates the client, and sends the browser back to the registered callback URL with an authorization code.</p>
+                <div class="mt-8 grid gap-4 sm:grid-cols-2">
+                    <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+                        <p class="text-sm font-semibold text-white">No direct tokens</p>
+                        <p class="mt-2 text-sm text-slate-400">Signin now returns a code instead of access and refresh tokens.</p>
+                    </div>
+                    <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+                        <p class="text-sm font-semibold text-white">Token exchange</p>
+                        <p class="mt-2 text-sm text-slate-400">Your client backend should exchange the code at `/api/auth/token`.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-slate-900/80 p-8 sm:p-10">
+                <div id="client-meta" class="mb-6 rounded-2xl border border-white/10 bg-slate-950/80 p-4 text-sm text-slate-300"></div>
+                <form id="signin-form" class="space-y-5">
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-slate-200" for="email">Email address</label>
+                        <input id="email" name="email" type="email" required class="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30" placeholder="aarav@example.com">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-slate-200" for="password">Password</label>
+                        <input id="password" name="password" type="password" required class="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30" placeholder="Enter your password">
+                    </div>
+                    <button id="submit-button" type="submit" class="w-full rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-bold uppercase tracking-[0.2em] text-slate-950 transition hover:bg-emerald-300">Signin and Continue</button>
+                </form>
+                <div id="status" class="mt-4 hidden rounded-2xl border px-4 py-3 text-sm"></div>
+                <p class="mt-6 text-sm text-slate-400">Need an account? <a class="font-semibold text-emerald-300 underline" id="signup-link" href="/api/auth/signup">Go to signup</a></p>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const clientId = params.get("client_id");
+        const redirectUri = params.get("redirect_uri");
+        const state = params.get("state");
+        const form = document.getElementById("signin-form");
+        const statusBox = document.getElementById("status");
+        const submitButton = document.getElementById("submit-button");
+        const clientMeta = document.getElementById("client-meta");
+        const signupLink = document.getElementById("signup-link");
+
+        const setStatus = (message, type) => {
+            statusBox.textContent = message;
+            statusBox.className = "mt-4 rounded-2xl border px-4 py-3 text-sm";
+            statusBox.classList.remove("hidden");
+
+            if (type === "error") {
+                statusBox.classList.add("border-rose-400/30", "bg-rose-400/10", "text-rose-100");
+                return;
+            }
+
+            statusBox.classList.add("border-emerald-400/30", "bg-emerald-400/10", "text-emerald-100");
+        };
+
+        if (clientId) {
+            clientMeta.innerHTML = `<p><span class="font-semibold text-white">Client ID:</span> <span class="break-all">${clientId}</span></p><p class="mt-2"><span class="font-semibold text-white">Redirect URI:</span> <span class="break-all">${redirectUri || "Registered redirect URL will be used."}</span></p>`;
+            signupLink.href = `/api/auth/signup${window.location.search}`;
+        } else {
+            clientMeta.innerHTML = `<p class="font-semibold text-rose-200">Missing client_id.</p><p class="mt-2 text-slate-400">Open signin from a registered client link so a code can be issued back to your app.</p>`;
+            submitButton.disabled = true;
+            submitButton.classList.add("cursor-not-allowed", "opacity-50");
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            setStatus("Signing in...", "info");
+
+            const payload = {
+                email: form.email.value,
+                password: form.password.value,
+                clientId,
+                redirectUri: redirectUri || undefined,
+                state: state || undefined
+            };
+
+            try {
+                const response = await fetch(window.location.pathname, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || "Signin failed");
+                }
+
+                setStatus("Authorization code created. Redirecting back to the client...", "info");
+                setTimeout(() => {
+                    window.location.href = result.data.redirectTo;
+                }, 700);
+            } catch (error) {
+                setStatus(error.message || "Signin failed", "error");
+            }
+        });
+    </script>
+</body>
+</html>

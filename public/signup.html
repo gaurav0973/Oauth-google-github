@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-stone-950 text-stone-100">
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.16),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(234,179,8,0.14),_transparent_28%)]"></div>
+    <main class="relative mx-auto flex min-h-screen max-w-5xl items-center px-4 py-10 sm:px-6">
+        <div class="grid w-full overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-orange-950/20 lg:grid-cols-[0.95fr_1.05fr]">
+            <section class="bg-gradient-to-br from-orange-500/20 via-amber-400/10 to-transparent p-8 sm:p-10">
+                <p class="text-sm font-semibold uppercase tracking-[0.3em] text-amber-200">Create Account</p>
+                <h1 class="mt-5 text-4xl font-black tracking-tight text-white">Start the authorization flow with a new user</h1>
+                <p class="mt-4 max-w-md text-base leading-7 text-stone-300">This page creates the user, validates the client ID, and returns an authorization code tied to the registered redirect URL.</p>
+                <div class="mt-8 rounded-3xl border border-white/10 bg-stone-950/50 p-5">
+                    <p class="text-sm font-semibold text-white">Flow notes</p>
+                    <ul class="mt-3 space-y-2 text-sm text-stone-400">
+                        <li>Client ID is required for signup.</li>
+                        <li>The redirect URI must match the client registration.</li>
+                        <li>After success, the page redirects back with a `code` parameter.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="p-8 sm:p-10">
+                <div id="client-meta" class="mb-6 rounded-2xl border border-white/10 bg-stone-900/80 p-4 text-sm text-stone-300"></div>
+                <form id="signup-form" class="space-y-5">
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-stone-200" for="name">Full name</label>
+                        <input id="name" name="name" type="text" required class="w-full rounded-2xl border border-white/10 bg-stone-950 px-4 py-3 text-white outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Aarav Sharma">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-stone-200" for="email">Email address</label>
+                        <input id="email" name="email" type="email" required class="w-full rounded-2xl border border-white/10 bg-stone-950 px-4 py-3 text-white outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="aarav@example.com">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-stone-200" for="password">Password</label>
+                        <input id="password" name="password" type="password" required class="w-full rounded-2xl border border-white/10 bg-stone-950 px-4 py-3 text-white outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Create a secure password">
+                    </div>
+                    <button id="submit-button" type="submit" class="w-full rounded-2xl bg-amber-400 px-4 py-3 text-sm font-bold uppercase tracking-[0.2em] text-stone-950 transition hover:bg-amber-300">Create User and Continue</button>
+                </form>
+                <div id="status" class="mt-4 hidden rounded-2xl border px-4 py-3 text-sm"></div>
+                <p class="mt-6 text-sm text-stone-400">Already have an account? <a class="font-semibold text-amber-300 underline" id="signin-link" href="/api/auth/signin">Go to signin</a></p>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const clientId = params.get("client_id");
+        const redirectUri = params.get("redirect_uri");
+        const state = params.get("state");
+        const form = document.getElementById("signup-form");
+        const statusBox = document.getElementById("status");
+        const submitButton = document.getElementById("submit-button");
+        const clientMeta = document.getElementById("client-meta");
+        const signinLink = document.getElementById("signin-link");
+
+        const setStatus = (message, type) => {
+            statusBox.textContent = message;
+            statusBox.className = "mt-4 rounded-2xl border px-4 py-3 text-sm";
+            statusBox.classList.remove("hidden");
+
+            if (type === "error") {
+                statusBox.classList.add("border-rose-400/30", "bg-rose-400/10", "text-rose-100");
+                return;
+            }
+
+            statusBox.classList.add("border-amber-400/30", "bg-amber-400/10", "text-amber-100");
+        };
+
+        if (clientId) {
+            clientMeta.innerHTML = `<p><span class="font-semibold text-white">Client ID:</span> <span class="break-all">${clientId}</span></p><p class="mt-2"><span class="font-semibold text-white">Redirect URI:</span> <span class="break-all">${redirectUri || "Registered redirect URL will be used."}</span></p>`;
+            signinLink.href = `/api/auth/signin${window.location.search}`;
+        } else {
+            clientMeta.innerHTML = `<p class="font-semibold text-rose-200">Missing client_id.</p><p class="mt-2 text-stone-400">Open this page using a registered client link so signup can issue an authorization code.</p>`;
+            submitButton.disabled = true;
+            submitButton.classList.add("cursor-not-allowed", "opacity-50");
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            setStatus("Creating user...", "info");
+
+            const payload = {
+                name: form.name.value,
+                email: form.email.value,
+                password: form.password.value,
+                clientId,
+                redirectUri: redirectUri || undefined,
+                state: state || undefined
+            };
+
+            try {
+                const response = await fetch(window.location.pathname, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || "Signup failed");
+                }
+
+                setStatus("Authorization code created. Redirecting back to the client...", "info");
+                setTimeout(() => {
+                    window.location.href = result.data.redirectTo;
+                }, 700);
+            } catch (error) {
+                setStatus(error.message || "Signup failed", "error");
+            }
+        });
+    </script>
+</body>
+</html>

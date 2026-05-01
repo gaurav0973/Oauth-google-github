@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register OAuth Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.18),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_28%)]"></div>
+    <main class="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
+        <div class="grid w-full gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+            <section class="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur sm:p-10">
+                <p class="mb-4 inline-flex rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200">OAuth Setup</p>
+                <h1 class="max-w-2xl text-4xl font-black tracking-tight text-white sm:text-5xl">Register a client for your auth server</h1>
+                <p class="mt-4 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">Create a client ID and client secret backed by your database. Use the generated credentials to start the signup and signin code flow.</p>
+                <div class="mt-8 grid gap-4 sm:grid-cols-3">
+                    <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+                        <p class="text-sm font-semibold text-white">Secure IDs</p>
+                        <p class="mt-2 text-sm text-slate-400">Client ID and client secret are generated as UUID values.</p>
+                    </div>
+                    <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+                        <p class="text-sm font-semibold text-white">Redirect Safety</p>
+                        <p class="mt-2 text-sm text-slate-400">Every auth request is matched against the redirect URL you register here.</p>
+                    </div>
+                    <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+                        <p class="text-sm font-semibold text-white">Code Flow</p>
+                        <p class="mt-2 text-sm text-slate-400">Signin returns an authorization code, not tokens, so clients can exchange it securely.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl shadow-cyan-900/20">
+                <h2 class="text-2xl font-bold text-white">Client registration</h2>
+                <p class="mt-2 text-sm text-slate-400">Use a real application URL and redirect URL. The same redirect URL must be used during the token exchange.</p>
+
+                <form id="client-form" class="mt-8 space-y-5">
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-slate-200" for="applicationName">Application name</label>
+                        <input id="applicationName" name="applicationName" type="text" required class="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30" placeholder="Acme Dashboard">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-slate-200" for="contactEmail">Contact email</label>
+                        <input id="contactEmail" name="contactEmail" type="email" required class="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30" placeholder="ops@acme.test">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-slate-200" for="applicationUrl">Application URL</label>
+                        <input id="applicationUrl" name="applicationUrl" type="url" required class="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30" placeholder="https://app.acme.test">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-slate-200" for="redirectUrl">Redirect URL</label>
+                        <input id="redirectUrl" name="redirectUrl" type="url" required class="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30" placeholder="https://app.acme.test/callback">
+                    </div>
+                    <button type="submit" class="w-full rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-bold uppercase tracking-[0.2em] text-slate-950 transition hover:bg-cyan-300">Create Client</button>
+                </form>
+
+                <div id="status" class="mt-4 hidden rounded-2xl border px-4 py-3 text-sm"></div>
+                <div id="result" class="mt-6 hidden rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-5 text-sm text-emerald-50"></div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const form = document.getElementById("client-form");
+        const statusBox = document.getElementById("status");
+        const resultBox = document.getElementById("result");
+
+        const setStatus = (message, type) => {
+            statusBox.textContent = message;
+            statusBox.className = "mt-4 rounded-2xl border px-4 py-3 text-sm";
+            statusBox.classList.remove("hidden");
+
+            if (type === "error") {
+                statusBox.classList.add("border-rose-400/30", "bg-rose-400/10", "text-rose-100");
+                return;
+            }
+
+            statusBox.classList.add("border-cyan-400/30", "bg-cyan-400/10", "text-cyan-100");
+        };
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            resultBox.classList.add("hidden");
+            setStatus("Creating client...", "info");
+
+            const payload = {
+                applicationName: form.applicationName.value,
+                contactEmail: form.contactEmail.value,
+                applicationUrl: form.applicationUrl.value,
+                redirectUrl: form.redirectUrl.value
+            };
+
+            try {
+                const response = await fetch(window.location.pathname, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || "Client registration failed");
+                }
+
+                const client = result.data;
+                const signinUrl = `${window.location.origin}/api/auth/signin?client_id=${encodeURIComponent(client.clientId)}&redirect_uri=${encodeURIComponent(client.redirectUrl)}`;
+                const signupUrl = `${window.location.origin}/api/auth/signup?client_id=${encodeURIComponent(client.clientId)}&redirect_uri=${encodeURIComponent(client.redirectUrl)}`;
+
+                setStatus("Client created successfully.", "info");
+                resultBox.innerHTML = `
+                    <p class="text-base font-semibold text-white">Save these credentials in your client app</p>
+                    <div class="mt-4 grid gap-3">
+                        <div><span class="font-semibold text-emerald-100">Client ID:</span> <span class="break-all">${client.clientId}</span></div>
+                        <div><span class="font-semibold text-emerald-100">Client Secret:</span> <span class="break-all">${client.clientSecret}</span></div>
+                        <div><span class="font-semibold text-emerald-100">Signin URL:</span> <a class="break-all underline" href="${signinUrl}">${signinUrl}</a></div>
+                        <div><span class="font-semibold text-emerald-100">Signup URL:</span> <a class="break-all underline" href="${signupUrl}">${signupUrl}</a></div>
+                    </div>
+                `;
+                resultBox.classList.remove("hidden");
+            } catch (error) {
+                setStatus(error.message || "Client registration failed", "error");
+            }
+        });
+    </script>
+</body>
+</html>
