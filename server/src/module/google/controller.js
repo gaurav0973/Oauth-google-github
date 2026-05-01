@@ -3,6 +3,7 @@ import { google } from "../../common/oAuth/google.auth.js";
 import { OauthAccount } from "../../common/models/oauthAccount.model.js";
 import { User } from "../../common/models/user.model.js";
 import { generateAccessToken, generateRefreshToken } from "../../common/utils/jwt.js";
+import { RefreshToken } from "../../common/models/refreshToken.model.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
 
@@ -84,6 +85,11 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
             const accessToken = generateAccessToken(user._id);
             const refreshToken = generateRefreshToken(user._id);
 
+            await RefreshToken.create({
+                userId: user._id,
+                token: refreshToken,
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            });
             // access token (short)
             res.cookie("accessToken", accessToken, {
                 httpOnly: true,
@@ -124,6 +130,12 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
             const accessToken = generateAccessToken(user._id);
             const refreshToken = generateRefreshToken(user._id);
 
+            await RefreshToken.create({
+                userId: user._id,
+                token: refreshToken,
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            });
+
             res.cookie("accessToken", accessToken, {
                 httpOnly: true,
                 secure: false,
@@ -161,6 +173,12 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
         // TODO: generate JWT and set cookie here for real app
         const accessToken = generateAccessToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
+
+        await RefreshToken.create({
+            userId: user._id,
+            token: refreshToken,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
 
         res.cookie("accessToken", accessToken, {
             httpOnly: true,

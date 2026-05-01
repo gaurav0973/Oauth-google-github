@@ -3,6 +3,7 @@ import { github } from "../../common/oAuth/github.auth.js";
 import { User } from "../../common/models/user.model.js";
 import { OauthAccount } from "../../common/models/oauthAccount.model.js";
 import { generateAccessToken, generateRefreshToken } from "../../common/utils/jwt.js";
+import { RefreshToken } from "../../common/models/refreshToken.model.js";
 
 const FRONTEND_ORIGIN =
     process.env.FRONTEND_ORIGIN || "http://localhost:5173";
@@ -108,6 +109,12 @@ export const getGithubCallbackPage = async (req, res) => {
 
         const accessToken = generateAccessToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
+        
+        await RefreshToken.create({
+            userId: user._id,
+            token: refreshToken,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
 
         res.cookie("accessToken", accessToken, {
             httpOnly: true,

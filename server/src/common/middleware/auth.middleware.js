@@ -12,14 +12,15 @@ export const authMiddleware = async (req, res, next) => {
         const decoded = verifyToken(token, process.env.JWT_SECRET);
 
         const user = await User.findById(decoded.userId);
+
         if (!user) {
-            return res.status(401).json({ message: "User not found" });
+        return res.status(401).json({ message: "User not found" });
         }
 
         req.user = user;
-        next();
 
+        next();
     } catch (err) {
-        return res.status(401).json({ message: "Invalid access token" });
+        return res.status(401).json({ message: "Invalid token" });
     }
 };
