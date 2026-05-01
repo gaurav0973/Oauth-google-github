@@ -50,14 +50,14 @@ const ProfilePage = () => {
         </h2>
 
         <p className="mb-4">Email: {user?.email}</p>
-
-        {user?.photo && (
+        
+        {
             <img
-            src={user.photo}
-            alt="profile"
-            className="w-24 h-24 rounded-full mx-auto mb-4"
-            />
-        )}
+                src={user?.photo || "https://placehold.co/100x100"}
+                alt="profile"
+                className="w-24 h-24 rounded-full mx-auto mb-4"
+                />
+        }
 
         <button
             onClick={handleLogout}

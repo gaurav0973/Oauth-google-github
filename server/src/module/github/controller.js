@@ -2,15 +2,22 @@ import { generateState } from "arctic";
 import { github } from "../../common/oAuth/github.auth.js";
 import { User } from "../../common/models/user.model.js";
 import { OauthAccount } from "../../common/models/oauthAccount.model.js";
+import { generateToken } from "../../common/utils/jwt.js";
+
+const FRONTEND_ORIGIN =
+    process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
 export const getGithubLoginPage = async (req, res) => {
     const state = generateState();
 
-    const url = github.createAuthorizationURL(state, ["read:user", "user:email"]);
-    console.log("Generated GitHub Auth URL 👉", url.toString());
+    const url = github.createAuthorizationURL(state, [
+        "read:user",
+        "user:email",
+    ]);
+
     const cookieOptions = {
         httpOnly: true,
-        secure: false, // ⚠️ localhost
+        secure: false,
         maxAge: 5 * 60 * 1000,
         sameSite: "lax",
     };
@@ -22,7 +29,6 @@ export const getGithubLoginPage = async (req, res) => {
 
 export const getGithubCallbackPage = async (req, res) => {
     const { code, state } = req.query;
-
     const storedState = req.cookies.github_oauth_state;
 
     if (!code || !state || !storedState) {
@@ -43,7 +49,7 @@ export const getGithubCallbackPage = async (req, res) => {
 
     const accessToken = tokens.accessToken();
 
-    // 🔥 Fetch GitHub user
+    // 🔥 GitHub user
     const userRes = await fetch("https://api.github.com/user", {
         headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -51,10 +57,9 @@ export const getGithubCallbackPage = async (req, res) => {
     });
 
     const githubUser = await userRes.json();
-
     const { id: githubUserId, login: username, avatar_url } = githubUser;
 
-  // 🔥 Fetch email separately (GitHub quirk)
+    // 🔥 GitHub email
     const emailRes = await fetch("https://api.github.com/user/emails", {
         headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -65,52 +70,55 @@ export const getGithubCallbackPage = async (req, res) => {
     const primaryEmail = emails.find((e) => e.primary)?.email;
 
     try {
-        // ✅ STEP 1 — check OAuthAccount
         let oauthAccount = await OauthAccount.findOne({
         provider: "github",
         providerAccountId: githubUserId,
         }).populate("userId");
 
-        if (oauthAccount) {
-        return res.json({
-            message: "Login successful (GitHub)",
-            user: oauthAccount.userId,
-        });
-        }
+        let user;
 
-        // ✅ STEP 2 — check existing user
-        let user = await User.findOne({ email: primaryEmail });
+        // ✅ CASE 1: already linked
+        if (oauthAccount) {
+        user = oauthAccount.userId;
+        } else {
+        // ✅ CASE 2: user exists
+        user = await User.findOne({ email: primaryEmail });
 
         if (user) {
-        await OauthAccount.create({
+            await OauthAccount.create({
             userId: user._id,
             provider: "github",
             providerAccountId: githubUserId,
-        });
+            });
+        } else {
+            // ✅ CASE 3: new user
+            user = await User.create({
+            email: primaryEmail,
+            username,
+            photo: avatar_url,
+            });
 
-        return res.json({
-            message: "GitHub linked",
-            user,
-        });
+            await OauthAccount.create({
+            userId: user._id,
+            provider: "github",
+            providerAccountId: githubUserId,
+            });
+        }
         }
 
-        // ✅ STEP 3 — create new user
-        user = await User.create({
-        email: primaryEmail,
-        username,
-        photo: avatar_url,
+        // 🔥 COMMON AUTH (THIS WAS MISSING)
+        const token = generateToken(user._id);
+
+        res.cookie("token", token, {
+        httpOnly: true,
+        secure: false, // true in production
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
-        await OauthAccount.create({
-        userId: user._id,
-        provider: "github",
-        providerAccountId: githubUserId,
-        });
+        res.clearCookie("github_oauth_state");
 
-        return res.json({
-        message: "User created via GitHub",
-        user,
-        });
+        return res.redirect(`${FRONTEND_ORIGIN}/profile`);
 
     } catch (err) {
         console.error(err);
