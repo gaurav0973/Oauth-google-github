@@ -1,0 +1,25 @@
+import { User } from "../models/user.model.js";
+import { verifyToken } from "../utils/jwt.js";
+
+export const authMiddleware = async (req, res, next) => {
+    try {
+        const token = req.cookies.token;
+
+        if (!token) {
+        return res.status(401).json({ message: "Not authenticated" });
+        }
+
+        const decoded = verifyToken(token);
+
+        const user = await User.findById(decoded.userId);
+        if (!user) {
+        return res.status(401).json({ message: "User not found" });
+        }
+
+        req.user = user;
+
+        next();
+    } catch (err) {
+        return res.status(401).json({ message: "Invalid token" });
+    }
+};

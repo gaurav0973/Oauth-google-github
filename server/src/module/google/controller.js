@@ -2,6 +2,7 @@ import { decodeIdToken, generateCodeVerifier, generateState } from "arctic";
 import { google } from "../../common/oAuth/google.auth.js";
 import { OauthAccount } from "../../common/models/oauthAccount.model.js";
 import { User } from "../../common/models/user.model.js";
+import { generateToken } from "../../common/utils/jwt.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
 
@@ -79,10 +80,21 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
             const user = oauthAccount.userId;
             console.log("User from DB 👉", user);
 
-            return res.json({
-                message: "Login successful (Google)",
-                user,
+            // TODO: generate JWT and set cookie here for real app
+            const token = generateToken(user._id);
+
+            res.cookie("token", token, {
+                httpOnly: true,
+                secure: false, // change to true in production (HTTPS)
+                sameSite: "lax",
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
             });
+
+            // clear temp OAuth cookies
+            res.clearCookie("google_oauth_state");
+            res.clearCookie("google_code_verifier");
+
+            return res.redirect(`${FRONTEND_ORIGIN}/profile`);
         }
 
         // 🔥 STEP 2 — Check if user exists by email
@@ -98,10 +110,20 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
                 providerAccountId: googleUserId,
             });
 
-            return res.json({
-                message: "Google account linked",
-                user,
+            // TODO: generate JWT and set cookie here for real app
+            const token = generateToken(user._id);
+
+            res.cookie("token", token, {
+                httpOnly: true,
+                secure: false, // change to true in production (HTTPS)
+                sameSite: "lax",
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
             });
+
+            // clear temp OAuth cookies
+            res.clearCookie("google_oauth_state");
+            res.clearCookie("google_code_verifier");
+            return res.redirect(`${FRONTEND_ORIGIN}/profile`);
         }
 
         // 🔥 STEP 3 — completely new user
@@ -118,10 +140,21 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
             providerAccountId: googleUserId,
         });
 
-        return res.json({
-            message: "User created with Google",
-            user,
+        // TODO: generate JWT and set cookie here for real app
+        const token = generateToken(user._id);
+
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: false, // change to true in production (HTTPS)
+            sameSite: "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
+
+        // clear temp OAuth cookies
+        res.clearCookie("google_oauth_state");
+        res.clearCookie("google_code_verifier");
+
+        return res.redirect(`${FRONTEND_ORIGIN}/profile`);
 
     } catch (error) {
         console.error(error);
