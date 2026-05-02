@@ -84,6 +84,9 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
             // TODO: generate JWT and set cookie here for real app
             const accessToken = generateAccessToken(user._id);
             const refreshToken = generateRefreshToken(user._id);
+            
+            // 🔥 DELETE old tokens for this user (optional but clean)
+            await RefreshToken.deleteMany({ userId: user._id });
 
             await RefreshToken.create({
                 userId: user._id,
@@ -129,6 +132,9 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
             // TODO: generate JWT and set cookie here for real app
             const accessToken = generateAccessToken(user._id);
             const refreshToken = generateRefreshToken(user._id);
+            
+            // 🔥 DELETE old tokens for this user (optional but clean)
+            await RefreshToken.deleteMany({ userId: user._id });
 
             await RefreshToken.create({
                 userId: user._id,
@@ -173,7 +179,9 @@ export const getGoogleLoginCallbackPage = async (req, res) => {
         // TODO: generate JWT and set cookie here for real app
         const accessToken = generateAccessToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
-
+        // 🔥 DELETE old tokens for this user (optional but clean)
+        await RefreshToken.deleteMany({ userId: user._id });
+        
         await RefreshToken.create({
             userId: user._id,
             token: refreshToken,

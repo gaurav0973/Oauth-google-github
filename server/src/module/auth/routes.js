@@ -5,30 +5,52 @@ const authRoutes = Router();
 
 
 authRoutes.get("/refresh", async (req, res) => {
-    const refreshToken = req.cookies.refreshToken;
-    if (!refreshToken) {
+    const oldToken = req.cookies.refreshToken;
+
+    if (!oldToken) {
         return res.status(401).json({ message: "No refresh token" });
     }
 
     try {
-        // verify JWT
+        // ✅ verify JWT
         const decoded = verifyToken(
-        refreshToken,
+        oldToken,
         process.env.JWT_REFRESH_SECRET
         );
 
-        // check DB
+        // ✅ find token in DB
         const storedToken = await RefreshToken.findOne({
-        token: refreshToken,
+        token: oldToken,
         });
 
-        if (!storedToken) {
-        return res.status(401).json({ message: "Token not found" });
+        // 🚨 TOKEN REUSE DETECTED
+        if (!storedToken || storedToken.isRevoked) {
+        // 🔥 security action: logout all sessions
+        await RefreshToken.deleteMany({ userId: decoded.userId });
+
+        return res.status(403).json({
+            message: "Refresh token reuse detected",
+        });
         }
 
-        // generate new access token
-        const newAccessToken = generateAccessToken(decoded.userId);
+        // 🔥 ROTATION STARTS HERE
 
+        // 1. revoke old token
+        storedToken.isRevoked = true;
+        await storedToken.save();
+
+        // 2. issue new tokens
+        const newAccessToken = generateAccessToken(decoded.userId);
+        const newRefreshToken = generateRefreshToken(decoded.userId);
+
+        // 3. store new refresh token
+        await RefreshToken.create({
+        userId: decoded.userId,
+        token: newRefreshToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        // 4. set cookies
         res.cookie("accessToken", newAccessToken, {
         httpOnly: true,
         secure: false,
@@ -36,7 +58,14 @@ authRoutes.get("/refresh", async (req, res) => {
         maxAge: 15 * 60 * 1000,
         });
 
-        return res.json({ message: "Refreshed" });
+        res.cookie("refreshToken", newRefreshToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+
+        return res.json({ message: "Token rotated" });
 
     } catch (err) {
         return res.status(401).json({ message: "Invalid refresh token" });
@@ -44,12 +73,14 @@ authRoutes.get("/refresh", async (req, res) => {
 });
 
 
-
 authRoutes.get("/logout", async (req, res) => {
     const refreshToken = req.cookies.refreshToken;
 
     if (refreshToken) {
-        await RefreshToken.deleteOne({ token: refreshToken });
+        await RefreshToken.updateOne(
+        { token: refreshToken },
+        { isRevoked: true }
+        );
     }
 
     res.clearCookie("accessToken");

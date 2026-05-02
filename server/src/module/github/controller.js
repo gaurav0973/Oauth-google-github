@@ -110,6 +110,9 @@ export const getGithubCallbackPage = async (req, res) => {
         const accessToken = generateAccessToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
         
+        // 🔥 DELETE old tokens for this user (optional but clean)
+        await RefreshToken.deleteMany({ userId: user._id });
+        
         await RefreshToken.create({
             userId: user._id,
             token: refreshToken,
